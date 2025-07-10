@@ -1,0 +1,24 @@
+.env
+*.session # To ignore Telethon session files (e.g., my_session.session)
+data_lake/raw/ # To ignore raw data stored in your local data lake volume
+downloads/ # To ignore downloaded media/profile pics
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.venv/
+*.log
+.DS_Store # For macOS users, good to include
+.env
+*.session
+data_lake/raw/
+downloads/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.venv/
+*.log
+.DS_Store
+
+# New additions for this task:
+*.csv
+data/

@@ -1,0 +1,12 @@
+telethon
+psycopg2-binary # For PostgreSQL connection
+python-dotenv # To load environment variables
+fastapi
+uvicorn # ASGI server for FastAPI
+dbt-core
+dbt-postgres # For dbt with PostgreSQL
+ultralytics # For YOLOv8
+dagster
+dagster-webserver
+dagster-dbt
+pandas # For data manipulation

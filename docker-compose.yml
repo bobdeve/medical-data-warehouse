@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database Service
+  db:
+    image: postgres:13
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432" # Map container port 5432 to host port 5432
+
+  # Python Application Service (will run scraping, dbt, FastAPI, etc. via Dagster or direct exec)
+  app:
+    build: . # Build from the Dockerfile in the current directory
+    restart: on-failure
+    depends_on:
+      - db # Ensure database is up before starting the app
+    environment:
+      # Pass secrets from .env to the container
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+      TELEGRAM_PHONE_NUMBER: ${TELEGRAM_PHONE_NUMBER}
+      POSTGRES_HOST: db # Use the service name 'db' for inter-container communication
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Add any other environment variables needed for YOLO, etc.
+    volumes:
+      - .:/app # Mount the current directory into the container for code changes
+      - telegram_session:/app/telegram_session # Volume for Telethon session file
+      - raw_data_lake:/app/data_lake/raw # Volume for raw scraped data
+      - media_downloads:/app/downloads # Volume for downloaded media files
+    tty: true # Keep the container running in the foreground, useful for exec
+    stdin_open: true # Allow interactive input
+
+  # Dagster Webserver and Daemon Service
+  dagster:
+    build: . # Use the same app image for Dagster
+    restart: on-failure
+    depends_on:
+      - db
+      - app # Depends on app to access dbt and other scripts within the /app volume
+    environment:
+      # Pass secrets to Dagster as well
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH}
+      TELEGRAM_PHONE_NUMBER: ${TELEGRAM_PHONE_NUMBER}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      DAGSTER_HOME: /opt/dagster/dagster_home # Where Dagster stores its metadata
+    volumes:
+      - .:/app
+      - telegram_session:/app/telegram_session
+      - raw_data_lake:/app/data_lake/raw
+      - media_downloads:/app/downloads
+      - dagster_home:/opt/dagster/dagster_home # Persistent storage for Dagster metadata
+    ports:
+      - "3000:3000" # Dagit UI
+    # Command to start Dagster webserver and daemon
+    command: dagster-webserver -h 0.0.0.0 -p 3000
+
+volumes:
+  postgres_data: # Persistent volume for PostgreSQL data
+  telegram_session: # Persistent volume for Telethon session
+  raw_data_lake: # Persistent volume for raw scraped data
+  media_downloads: # Volume for downloaded media files
+  dagster_home: # Persistent volume for Dagster metadata

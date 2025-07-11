@@ -22,3 +22,4 @@ __pycache__/
 # New additions for this task:
 *.csv
 data/
+medical_warehouse/

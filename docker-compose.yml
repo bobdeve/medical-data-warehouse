@@ -14,7 +14,7 @@ services:
     ports:
       - "5432:5432" # Map container port 5432 to host port 5432
 
-  # Python Application Service (will run scraping, dbt, FastAPI, etc. via Dagster or direct exec)
+  # Python Application Service (for scraping, dbt, FastAPI - where scraper.py will run)
   app:
     build: . # Build from the Dockerfile in the current directory
     restart: on-failure
@@ -30,14 +30,17 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      # Add any other environment variables needed for YOLO, etc.
+      BASE_RAW_DATA_DIR: /app/data/raw # <-- IMPORTANT: Define base directory for raw data
     volumes:
-      - .:/app # Mount the current directory into the container for code changes
-      - telegram_session:/app/telegram_session # Volume for Telethon session file
-      - raw_data_lake:/app/data_lake/raw # Volume for raw scraped data
-      - media_downloads:/app/downloads # Volume for downloaded media files
+      - .:/app # Mount the entire current project directory into the container. This means:
+                # - src/ and dbt/ are available
+                # - local data/raw will map to /app/data/raw inside container
+      - telegram_session:/app/telegram_session # Volume for Telethon session file persistence
+      # - raw_data_volume:/app/data/raw # This line is technically redundant IF your data/raw is directly inside .:/app, but explicitly defining it here as raw_data_volume
+                                     # is good for clarity that this specific path is a volume.
+                                     # Let's use the explicit volume for robustness even if redundant with bind mount.
     tty: true # Keep the container running in the foreground, useful for exec
-    stdin_open: true # Allow interactive input
+    stdin_open: true # Allow interactive input (for Telegram login code)
 
   # Dagster Webserver and Daemon Service
   dagster:
@@ -56,21 +59,19 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      BASE_RAW_DATA_DIR: /app/data/raw # <-- IMPORTANT: Also define for Dagster
       DAGSTER_HOME: /opt/dagster/dagster_home # Where Dagster stores its metadata
     volumes:
-      - .:/app
-      - telegram_session:/app/telegram_session
-      - raw_data_lake:/app/data_lake/raw
-      - media_downloads:/app/downloads
+      - .:/app # Mount project code
+      - telegram_session:/app/telegram_session # Session persistence
+      - raw_data_volume:/app/data/raw # Raw data access
       - dagster_home:/opt/dagster/dagster_home # Persistent storage for Dagster metadata
     ports:
       - "3000:3000" # Dagit UI
-    # Command to start Dagster webserver and daemon
     command: dagster-webserver -h 0.0.0.0 -p 3000
 
 volumes:
   postgres_data: # Persistent volume for PostgreSQL data
   telegram_session: # Persistent volume for Telethon session
-  raw_data_lake: # Persistent volume for raw scraped data
-  media_downloads: # Volume for downloaded media files
+  raw_data_volume: # Explicitly named persistent volume for raw data lake
   dagster_home: # Persistent volume for Dagster metadata

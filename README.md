@@ -1,194 +1,49 @@
-This project is part of a larger data engineering challenge to build an end-to-end medical intelligence pipeline. It collects Telegram posts about medical products, stores the data in a structured warehouse (PostgreSQL), and uses dbt to build clean analytical models using a star schema. We also use YOLOv8 to enrich messages with visual object detection.
+Interim Submission Report
+Project Structure and Environment Setup
+The project is organized into a reproducible structure managed through Git.
 
-📁 Project Structure & Environment Setup
-🔧 Reproducible Environment
-The project uses a reproducible and production-ready layout:
+Environment dependencies are captured in requirements.txt.
 
-bash
-Copy
-Edit
-medical-data-warehouse/
-├── data/                  # Raw images & scraped JSON files
-├── notebooks/             # Jupyter notebooks for exploration and model dev
-├── dbt/                   # DBT project with staging and mart models
-├── docker-compose.yml     # Launches PostgreSQL + pgAdmin
-├── Dockerfile             # Builds image with scraper + Python tools
-├── requirements.txt       # Python packages
-├── .env                   # Environment secrets (API keys, DB creds)
-├── scrape.py              # Telegram scraping script
-├── load.py                # Load raw JSON into PostgreSQL
-├── detect.py              # YOLOv8 object detection on images
-└── README.md
-✅ Why this matters
-Dockerized services ensure consistent deployment across dev/staging/prod.
+Configuration and sensitive information are stored in a .env file, which is not committed to Git.
 
-.env decouples secrets from code.
+Optional Docker components (Dockerfile and docker-compose.yml) are included to ensure consistent deployment across different machines and environments.
 
-Jupyter notebooks support visual debugging and step-by-step data flow tracking.
+This setup guarantees that anyone cloning the repo can replicate the exact environment and run the pipeline with minimal setup effort.
 
-Anyone can reproduce this project by running just two commands:
-docker-compose up and dbt run.
+Raw Data Collection and Storage
+Data is scraped from target Telegram channels using Telegram API.
 
-📨 Raw Data Collection and Storage
-🔎 Scraping from Telegram
-We used the telethon library to scrape public messages, images, and metadata from channels like:
+Scraped raw data is saved as JSON files in a data lake folder structure partitioned by channel name and date to maintain organization and facilitate incremental updates.
 
-CheMed123
+Logging is implemented to monitor scraping progress and errors.
 
-Lobelia4Cosmetics
+Errors are handled gracefully, with warnings logged without stopping the pipeline, ensuring reliability during long scraping sessions.
 
-Each message is saved as a JSON file and image (if present).
+DBT Project Setup, Transformation, and Testing
+A dbt project was initialized and configured to connect to the PostgreSQL database using a profiles.yml configuration file.
 
-🗂️ Raw Data Organization
-kotlin
-Copy
-Edit
-data/
-└── raw/
-    ├── CheMed123/
-    │   ├── 2024-07-11.json
-    │   └── ...
-    ├── Lobelia4Cosmetics/
-    │   └── 2024-07-11.json
+Raw JSON data is loaded into PostgreSQL into a dedicated raw schema.
 
-data/
-└── images/
-    ├── CheMed123/
-    └── Lobelia4Cosmetics/
-🪵 Logging & Error Handling
-Scraper logs all events using Python’s logging module.
+Staging models (stg_telegram_messages) clean and lightly transform raw data by casting types and renaming columns.
 
-Handles network errors, media download issues, and Telegram API limits gracefully.
+Data mart models implement a star schema:
 
-✅ Best Practice: Raw data is organized by channel and date to support easy backfilling and partitioned processing.
+Dimension tables such as dim_channels and dim_dates.
 
-🛠️ DBT Setup, Transformation & Testing
-🔌 Connecting DBT to PostgreSQL
-DBT is configured to transform raw Telegram data into clean models.
+Fact table fct_messages linking dimension keys and including key metrics.
 
-Raw Layer: Raw JSON is loaded into a raw_messages table.
+Built-in dbt tests like unique and not_null ensure data quality on primary keys and critical columns.
 
-Staging Layer: stg_messages.sql cleans the raw schema and casts types.
+Custom tests enforce business rules to maintain data integrity and trustworthiness.
 
-Mart Layer: fct_messages.sql, dim_channels.sql, dim_dates.sql implement a star schema for analysis.
+Documentation and Repository Usability
+The repository contains detailed setup instructions for environment preparation, scraping raw data, loading data, and running dbt models.
 
-⭐ Star Schema Overview
-markdown
-Copy
-Edit
-dim_channels    dim_dates
-     │              │
-     └────┐    ┌────┘
-          ▼    ▼
-       fct_messages
-fct_messages: central fact table with post text, date, image presence.
+Usage examples include commands for running scraping (scrape.py), loading raw data (load_raw_data.py), and running dbt transformations (dbt run) and tests (dbt test).
 
-dim_channels: metadata for each Telegram channel.
+Code and dbt models are documented with comments explaining their purpose and logic.
 
-dim_dates: time dimension for aggregation.
+Visual diagrams (included in the docs/ folder) illustrate the overall data pipeline architecture and star schema for clarity.
 
-✅ DBT Tests
-unique + not_null for primary keys.
+This comprehensive documentation ensures any reviewer can replicate the full data pipeline manually and understand each component’s role.
 
-Referential integrity for foreign keys (channel_id, date_key).
-
-Configured via schema.yml.
-
-yaml
-Copy
-Edit
-  - name: message_id
-    tests:
-      - not_null
-      - unique
-✅ Result: Clean, trustworthy, and queryable data warehouse.
-
-🧠 Optional Enrichment: YOLOv8 Object Detection
-As an additional enrichment step:
-
-We used the Ultralytics YOLOv8 model to detect objects in images.
-
-Detected labels: "person", "bottle", "banana", etc.
-
-Detection results are stored in fct_image_detections with:
-
-message_id (FK to fct_messages)
-
-object_class
-
-object_label
-
-confidence_score
-
-✅ This adds image intelligence to text-based messages and allows tracking of common medical products visually.
-
-🖥️ Repository Usability & Reproducibility
-🔄 Step-by-Step Usage
-Clone the repo and install dependencies:
-
-bash
-Copy
-Edit
-git clone https://github.com/yourusername/medical-data-warehouse.git
-cd medical-data-warehouse
-pip install -r requirements.txt
-Configure .env with:
-
-Telegram API credentials
-
-PostgreSQL DB credentials
-
-Launch services:
-
-bash
-Copy
-Edit
-docker-compose up
-Run scrapers and loaders:
-
-bash
-Copy
-Edit
-python scrape.py
-python load.py
-dbt run
-Optional: Run YOLO detection:
-
-bash
-Copy
-Edit
-python detect.py
-📸 Visuals
-📊 Star Schema
-
-🔁 Pipeline Flow
-text
-Copy
-Edit
-[ Telegram API ]
-      ↓
-[ JSON & Image Storage ]
-      ↓
-[ PostgreSQL Raw Layer ]
-      ↓
-[ DBT Staging → Mart ]
-      ↓
-[ YOLOv8 Image Enrichment ]
-✅ Submission Alignment
-Metric	Status
-Project environment & reproducibility	✅
-Raw data lake setup + logging	✅
-DBT transformation & star schema	✅
-DBT tests for validation	✅
-Engineering justifications (README + report)	✅
-Visual diagrams (schema + pipeline)	✅
-Clear setup instructions in README	✅
-
-📌 Future Enhancements
-Deploy YOLOv8 detection as a microservice with queue-based inference.
-
-Use Apache Airflow to schedule scraping and loading pipelines.
-
-Add Looker Studio or Metabase dashboards on top of marts.
-
-Store enriched detections in a vector store for advanced search.

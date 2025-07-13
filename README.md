@@ -1,4 +1,5 @@
-🏥 Medical Data Warehouse - Telegram Product Intelligence
+🏥 Medical Data Warehouse 
+Telegram Product Intelligence
 📌 Project Overview
 This project aims to build a robust data pipeline that extracts, transforms, and enriches product and health-related information shared via Telegram messages. Using a modern data stack (PostgreSQL, dbt, YOLOv8, Docker, etc.), it powers downstream analytics by delivering clean, enriched, and queryable data.
 

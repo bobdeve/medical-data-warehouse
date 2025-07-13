@@ -1,0 +1,38 @@
+
+version: 2
+
+sources:
+  - name: public
+    database: telegram_db
+    schema: public
+    tables:
+      - name: raw_telegram_messages
+
+models:
+  - name: stg_telegram_messages
+    columns:
+      - name: message_id
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_channels
+    columns:
+      - name: channel_id
+        tests:
+          - unique
+          - not_null
+
+  - name: dim_dates
+    columns:
+      - name: date_id
+        tests:
+          - unique
+          - not_null
+
+  - name: fct_messages
+    columns:
+      - name: message_id
+        tests:
+          - unique
+          - not_null

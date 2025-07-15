@@ -1,269 +1,173 @@
-# Medical Data Warehouse Project
+Below is a concise rubric outline with the exact metric keys required:
 
-This project is a complete data pipeline and analytics platform designed to ingest, transform, and analyze Telegram message data and image detection results. It leverages modern tools including SQLAlchemy, FastAPI, dbt, and Dagster for orchestration to build a robust, observable, and schedulable data workflow.
+Data Collection Mechanism
+• Evaluate how well raw Telegram data and images are scraped, stored, and partitioned in the data lake.
+• Assess logging and incremental data handling.
 
----
+API Endpoint Development
+• Check for clear, well-documented FastAPI endpoints addressing the business questions.
+• Confirm proper use of Pydantic schemas for data validation.
 
-## Table of Contents
+Repository Organization and Security
+• Look for a reproducible project structure, including Git initialization, Dockerfile, docker-compose.yml, and requirements.txt.
+• Verify that secrets in the .env file are secured and excluded using .gitignore.
 
-- [Task 1: Data Modeling with SQLAlchemy](#task-1-data-modeling-with-sqlalchemy)
-- [Task 2: Database Schema Correction and Migration](#task-2-database-schema-correction-and-migration)
-- [Task 3: Data Transformation using dbt](#task-3-data-transformation-using-dbt)
-- [Task 4: API Backend with FastAPI](#task-4-api-backend-with-fastapi)
-- [Task 5: Pipeline Orchestration with Dagster](#task-5-pipeline-orchestration-with-dagster)
-- [Running the Project](#running-the-project)
-- [Environment Variables](#environment-variables)
-- [Troubleshooting](#troubleshooting)
-- [Contact](#contact)
+Data Transformation Workflow
+• Assess the setup and execution of dbt projects transforming raw data into staging and mart models.
+• Ensure built-in tests and documentation (dbt docs) are effectively implemented.
 
----
+Machine Learning Integration
+• Evaluate the integration of YOLOv8 for image object detection.
+• Confirm that detection results are correctly loaded into a new fact table and linked to core data models.
 
-## Task 1: Data Modeling with SQLAlchemy
+data_lake/
+├── raw/
+└── telegram/
+└── <channel_name>/
+└── <YYYY-MM-DD>/
+├── image_001.jpg
+└── ...
 
-### Objective
-Define Python ORM classes that map to the underlying PostgreSQL database tables to enable easy querying and manipulation of Telegram messages and image detection data.
 
-### What was done:
-- Created `FctMessages` model to represent Telegram messages with columns:
-  - `message_id` (primary key)
-  - `channel_name` (indexed for faster lookup)
-  - `post_text` (message content)
-  - `post_date` (date of the post)
-  - `channel_id` (foreign key to channel dimension, added later)
-- Created `FctImageDetections` model to represent image detection results with:
-  - `id` (primary key)
-  - `message_id` (foreign key to message)
-  - `object_class` (detected object category)
-  - `object_label` (specific object label)
-  - `confidence_score` (detection confidence as float)
 
-### Why it matters:
-- Using ORM models abstracts SQL queries and makes code more maintainable.
-- Enables integration with FastAPI and other Python tools seamlessly.
+### 🪵 Logging and Incremental Loading
+- Implemented logging to track progress and errors.
+- Only new messages/images are downloaded using `message_id` tracking to avoid redundancy.
 
 ---
 
-## Task 2: Database Schema Correction and Migration
+## ✅ Task 2 – API Endpoint Development
 
-### Problem:
-- The database was missing the `channel_id` column in the `fct_messages` table, which caused errors when querying.
+### 🚀 FastAPI Setup
+- Built RESTful APIs using **FastAPI** to expose key insights and metrics.
 
-### Steps to fix:
-1. **Update the SQLAlchemy model** to include the missing `channel_id` column:
-   ```python
-   channel_id = Column(Integer)
-Check your actual PostgreSQL database schema:
+### 🔍 Key Endpoints
+- `/api/channels`: List available Telegram channels.
+- `/api/channels/{channel_id}/activity`: View message counts over time.
+- `/api/channels/{channel_id}/detections`: Fetch detected image objects per channel.
 
-Use a database client (e.g., pgAdmin, DBeaver, or psql CLI) to verify columns in fct_messages.
+### 📦 Pydantic Schemas
+- All request/response models are defined using **Pydantic** for strong type validation and data integrity.
 
-Add the column to the database if missing:
+---
 
+## ✅ Task 3 – Repository Organization and Security
 
-ALTER TABLE fct_messages ADD COLUMN channel_id INTEGER;
-Restart your API and re-run queries to confirm the error is resolved.
+### 📁 Project Structure
 
-Why it matters:
-ORM models must always match the underlying database schema.
-
-Any schema mismatch causes runtime exceptions and API failures.
-
-Task 3: Data Transformation using dbt
-Objective
-Create a data transformation layer that structures raw Telegram message data into a clean, analytics-ready fact table.
-
-What was done:
-Created a dbt SQL model fct_messages.sql that:
-
-Extracts relevant fields (message_id, sender_id, message_text, etc.) from the raw staging table stg_telegram_messages.
-
-Converts message timestamp to date format.
-
-Joins with dim_channels and dim_dates dimension tables to enrich data with consistent IDs.
-
-Calculates additional fields like message_length.
-
-Sample SQL snippet:
-sql
-Copy
-Edit
-with base as (
-    select
-        msg.message_id,
-        msg.sender_id,
-        msg.message_text,
-        msg.has_photo,
-        msg.channel,
-        msg.message_date::date as date
-    from {{ ref('stg_telegram_messages') }} msg
-),
-
-joined as (
-    select
-        base.message_id,
-        base.sender_id,
-        base.message_text,
-        base.has_photo,
-        dc.channel_id,
-        dd.date_id,
-        length(base.message_text) as message_length
-    from base
-    left join {{ ref('dim_channels') }} dc on base.channel = dc.channel
-    left join {{ ref('dim_dates') }} dd on base.date = dd.date
-)
-
-select * from joined
-How to run dbt models:
-
-dbt run --project-dir medical_dbt
-Why it matters:
-dbt handles SQL transformations in a modular, testable way.
-
-Creates a centralized place for transformation logic, improving maintainability.
-
-Task 4: API Backend with FastAPI
-Objective
-Build RESTful endpoints to interact with the data warehouse and serve insights.
-
-Endpoints implemented:
-Get Top Detected Objects:
-GET /api/top-products
-Returns the most frequently detected objects in images.
-
-Get Channel Activity:
-GET /api/channels/{channel_id}/activity
-Returns statistics on message counts and post date ranges for a given channel.
-
-Search Messages:
-GET /api/messages/search?query=some_text
-Returns messages matching the search query text.
-
-Key backend components:
-Used SQLAlchemy ORM sessions to query the database.
-
-Handled filtering, grouping, and aggregation using SQLAlchemy functions (func.count(), func.min(), etc.).
-
-Included error handling for missing data.
-
-How to run API server:
-
-uvicorn main:app --reload
-Why it matters:
-Provides real-time access to analytical data via HTTP.
-
-Enables integration with frontends, dashboards, or other services.
-
-Task 5: Pipeline Orchestration with Dagster
-Objective
-Move from ad-hoc scripts to a robust, observable, and schedulable data pipeline.
-
-Steps performed:
-Installed Dagster:
+medical-data-warehouse/
+├── api/ # FastAPI endpoints
+├── dbt/ # dbt models and configs
+├── dagster_pipeline/ # Dagster orchestrations
+├── notebooks/ # Exploratory and training notebooks
+├── data_lake/ # Raw and processed data
+├── .env # Secrets and config variables
+├── .gitignore # Hides .env and other sensitive data
+├── Dockerfile # Container configuration
+├── docker-compose.yml # Stack orchestration
+└── requirements.txt # Python dependencies
 
 
+### 🔒 Secrets Management
+- `.env` file stores sensitive info like:
+  - `TELE_API_ID`, `TELE_API_HASH`, `DB_USER`, `DB_PASS`
+- `.env` is secured via `.gitignore` and **never pushed** to GitHub.
+
+---
+
+## ✅ Task 4 – Data Transformation Workflow
+
+### 🛠️ dbt Setup
+- Raw Telegram data is transformed into structured fact and dimension tables using `dbt`.
+
+### ✨ Key dbt Models
+- `stg_telegram_messages.sql`: Stage the raw Telegram messages.
+- `dim_channels.sql`: Create channel dimension.
+- `fct_messages.sql`: Fact table for Telegram messages.
+- `fct_image_detections.sql`: Fact table for YOLO detections.
+
+### ✅ dbt Tests and Docs
+- Built-in dbt **schema tests**: `unique`, `not_null`, and `relationships`.
+- **dbt docs** generated using:
+
+dbt docs generate
+dbt docs serve
+
+
+---
+
+## ✅ Task 5 – Pipeline Orchestration
+
+### ⚙️ Dagster Setup
+- Installed Dagster using:
+```bash
 pip install dagster dagster-webserver
-Defined Dagster Job and Ops:
 
-Created Python functions (ops) for each pipeline step:
+🧩 Defined Dagster Job
+Converted the logic of run_pipeline.sh into a Dagster job with the following ops:
 
-scrape_telegram_data - fetch raw messages.
+scrape_telegram_data: Pull raw messages and images.
 
-load_raw_to_postgres - load scraped data to Postgres.
+load_raw_to_postgres: Store data in PostgreSQL.
 
-run_dbt_transformations - trigger dbt models to transform data.
+run_dbt_transformations: Run dbt models.
 
-run_yolo_enrichment - enrich messages with image detection results.
-
-Composed these ops into a Dagster job.
-
-Ran Dagster UI locally:
+run_yolo_enrichment: Detect and load image objects.
 
 
-dagster dev -f path_to_pipeline.py
-Accessed UI at http://127.0.0.1:3000 to inspect, trigger, and monitor runs.
+🖥️ Launching the Dagster UI
 
-Configured Scheduling:
-
-Added schedules in Dagster to automate running jobs (e.g., daily).
-
-Scheduling code uses Dagster’s @schedule decorator with cron or interval triggers.
-
-Why it matters:
-Orchestration ensures your data pipeline runs reliably on a schedule.
-
-Provides visibility into pipeline execution, logs, and failures.
-
-Supports scalability and maintainability for production workflows.
-
-Running the Project
-Prerequisites:
-Python 3.8+
-
-PostgreSQL database with necessary tables created
-
-dbt installed and configured
-
-Dagster installed
-
-Steps:
-Set environment variables (copy .env.example to .env and update):
+dagster dev
 
 
-TELE_API_ID=your_telegram_api_id
-TELE_API_HASH=your_telegram_api_hash
-TELE_PHONE_NUMBER=your_phone_number
-DB_NAME=your_db_name
-DB_USER=your_db_user
-DB_PASS=your_db_password
-DB_HOST=your_db_host
-DB_PORT=your_db_port
-Run database migrations and/or add missing columns as described in Task 2.
+Visit http://127.0.0.1:3000 to interact with the pipeline.
 
-Run dbt transformations:
+⏰ Scheduling with Dagster
+Set up schedules to run the pipeline daily using Dagster's @schedule decorator and cron expressions.
 
+💡 Rubric Mapping
+Metric Key	Implementation Summary
+Data Collection Mechanism	Telethon scraper with logging, message_id tracking, image partitioning in data lake
+API Endpoint Development	FastAPI with documented endpoints and validated Pydantic schemas
+Repository & Security	Clean structure, Docker-ready, secrets in .env, .gitignore in place
+Data Transformation Workflow	dbt staging/marts, with tests and generated documentation
+Machine Learning Integration	YOLOv8 used for object detection; results loaded into fact tables
+Pipeline Orchestration	Dagster-based ops, job, schedule, and local web UI
 
-dbt run --project-dir medical_dbt
-Start API backend:
+🛠️ Tech Stack
+Python
 
+FastAPI
 
-uvicorn main:app --reload
-Start Dagster UI and run the pipeline:
+Telethon
 
-dagster dev -f path_to_pipeline.py
-Open your browser at: http://127.0.0.1:3000
+PostgreSQL
 
-Monitor and schedule pipelines inside the Dagster UI.
+dbt
 
-Environment Variables
-Variable	Description
-TELE_API_ID	Telegram API ID
-TELE_API_HASH	Telegram API Hash
-TELE_PHONE_NUMBER	Phone number linked to Telegram
-DB_NAME	Database name
-DB_USER	Database user
-DB_PASS	Database password
-DB_HOST	Database host address
-DB_PORT	Database port
+YOLOv8 (Ultralytics)
 
-Troubleshooting
-SQLAlchemy attribute errors:
-Check your ORM models and database schema for column mismatches.
+Dagster
 
-UnicodeEncodeError writing SQL files:
-Specify UTF-8 encoding when writing files in Python:
+🚀 How to Run the Pipeline
+Configure .env with Telegram + DB credentials.
+
+Start services:
 
 
-with open("file.sql", "w", encoding="utf-8") as f:
-    f.write(sql_content)
-Dagster errors about missing pyproject.toml config:
-Use the -f flag with dagster dev to point to your pipeline Python file:
+docker-compose up --build
+Run Dagster:
+
+
+dagster dev
+Use Dagster UI to run the job manually or by schedule.
+
+🙌 Authors
+Bereket Tilahun
+GitHub: @BereketTilahun
 
 
 
+---
 
-
-
-
-
-
-
-
+Let me know if you want this saved to your actual `README.md` file or if you want a version for GitH

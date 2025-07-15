@@ -10,3 +10,7 @@ dagster
 dagster-webserver
 dagster-dbt
 pandas # For data manipulation
+fastapi
+uvicorn
+sqlalchemy
+psycopg2-binary
